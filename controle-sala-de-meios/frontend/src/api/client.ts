@@ -1,87 +1,97 @@
 import type {
-  AuthState,
-  Policial,
-  Relatorio,
-  RelatorioInput,
+    AuthState,
+    Policial,
+    Relatorio,
+    RelatorioInput,
 } from "../types";
-
-const BASE_URL = (import.meta as any).env?.VITE_API_URL || "http://localhost:8000";
+import { supabase } from "../lib/supabaseClient";
 
 class ApiError extends Error {
-  status: number;
-  constructor(message: string, status: number) {
-    super(message);
-    this.status = status;
-  }
-}
-
-function authHeaders(): Record<string, string> {
-  const raw = localStorage.getItem("csm_auth");
-  if (!raw) return {};
-  try {
-    const auth: AuthState = JSON.parse(raw);
-    return { Authorization: `Bearer ${auth.token}` };
-  } catch {
-    return {};
-  }
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...(options.headers || {}),
-    },
-  });
-
-  if (!res.ok) {
-    let detail = "Ocorreu um erro inesperado.";
-    try {
-      const body = await res.json();
-      detail = body.detail || detail;
-    } catch {
-      /* corpo vazio */
+    status: number;
+    constructor(message: string, status: number) {
+          super(message);
+          this.status = status;
     }
-    throw new ApiError(detail, res.status);
-  }
+}
 
-  if (res.status === 204) return undefined as unknown as T;
-  return res.json();
+async function login(email: string, senha: string): Promise<AuthState> {
+    const { data, error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password: senha,
+    });
+    if (error || !data.session || !data.user) {
+          throw new ApiError("Login ou senha inválidos.", 401);
+    }
+    const role = (data.user.user_metadata?.role as string) || "pelotao";
+    const nome = (data.user.user_metadata?.nome as string) || data.user.email || "";
+    return { token: data.session.access_token, role: role as AuthState["role"], nome };
+}
+
+async function listarPoliciais(): Promise<Policial[]> {
+    const { data, error } = await supabase
+      .from("policiais")
+      .select("id, nome_completo, nome_guerra, matricula")
+      .order("nome_guerra", { ascending: true });
+    if (error) throw new ApiError(error.message, 400);
+    return data as Policial[];
+}
+
+async function criarPolicial(payload: {
+    nome_completo: string;
+    nome_guerra: string;
+    matricula: string;
+}): Promise<Policial> {
+    const { data, error } = await supabase
+      .from("policiais")
+      .insert(payload)
+      .select("id, nome_completo, nome_guerra, matricula")
+      .single();
+    if (error) {
+          if ((error as any).code === "23505") {
+                  throw new ApiError("Já existe um policial cadastrado com essa matrícula.", 409);
+          }
+          throw new ApiError(error.message, 400);
+    }
+    return data as Policial;
+}
+
+async function removerPolicial(id: number): Promise<void> {
+    const { error } = await supabase.from("policiais").delete().eq("id", id);
+    if (error) throw new ApiError(error.message, 400);
+}
+
+async function listarRelatorios(filtros: { data?: string; pelotao?: string }): Promise<Relatorio[]> {
+    let query = supabase.from("relatorios").select("*").order("criado_em", { ascending: false });
+    if (filtros.data) query = query.eq("data", filtros.data);
+    if (filtros.pelotao) query = query.eq("pelotao", filtros.pelotao);
+    const { data, error } = await query;
+    if (error) throw new ApiError(error.message, 400);
+    return data as Relatorio[];
+}
+
+async function criarRelatorio(payload: RelatorioInput): Promise<Relatorio> {
+    const { data, error } = await supabase
+      .from("relatorios")
+      .insert({
+              data: payload.data,
+              pelotao: payload.pelotao,
+              distribuicoes: payload.distribuicoes,
+              responsavel: payload.responsavel,
+              assinatura: payload.assinatura,
+      })
+      .select("*")
+      .single();
+    if (error) throw new ApiError(error.message, 400);
+    return data as Relatorio;
 }
 
 export const api = {
-  login: (email: string, senha: string) =>
-    request<AuthState>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, senha }),
-    }),
-
-  listarPoliciais: () => request<Policial[]>("/api/policiais"),
-
-  criarPolicial: (data: { nome_completo: string; nome_guerra: string; matricula: string }) =>
-    request<Policial>("/api/policiais", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  removerPolicial: (id: number) =>
-    request<void>(`/api/policiais/${id}`, { method: "DELETE" }),
-
-  listarRelatorios: (filtros: { data?: string; pelotao?: string }) => {
-    const params = new URLSearchParams();
-    if (filtros.data) params.set("data", filtros.data);
-    if (filtros.pelotao) params.set("pelotao", filtros.pelotao);
-    const qs = params.toString();
-    return request<Relatorio[]>(`/api/relatorios${qs ? `?${qs}` : ""}`);
-  },
-
-  criarRelatorio: (data: RelatorioInput) =>
-    request<Relatorio>("/api/relatorios", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    login,
+    listarPoliciais,
+    criarPolicial,
+    removerPolicial,
+    listarRelatorios,
+    criarRelatorio,
 };
 
 export { ApiError };

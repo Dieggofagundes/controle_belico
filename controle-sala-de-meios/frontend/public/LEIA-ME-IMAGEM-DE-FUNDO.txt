@@ -1,0 +1,14 @@
+Para usar sua própria imagem de fundo (militar/institucional):
+
+1. Salve o arquivo de imagem nesta mesma pasta (public/) com o nome:
+   bg-fundo.jpg
+
+2. Pronto — o CSS em src/styles/globals.css já referencia
+   "/bg-fundo.jpg" como camada de fundo, com um overlay escuro por cima
+   para manter o texto legível.
+
+Caso o arquivo não exista, o sistema usa um padrão gráfico gerado em CSS
+(gradientes + textura sutil) como fundo, então a tela nunca fica quebrada.
+
+Se quiser usar outro nome/caminho, edite a variável --bg-photo em
+src/styles/globals.css.

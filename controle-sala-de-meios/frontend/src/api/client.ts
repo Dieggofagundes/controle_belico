@@ -69,25 +69,7 @@ async function listarRelatorios(filtros: { data?: string; pelotao?: string }): P
       return data as Relatorio[];
 }
 
-async function criarRelatorio(payload: RelatorioInput): Promise<Relatorio> {
-      const { error } = await supabase.from("relatorios").insert({
-              data: payload.data,
-              pelotao: payload.pelotao,
-              distribuicoes: payload.distribuicoes,
-              responsavel: payload.responsavel,
-              assinatura: payload.assinatura,
-      });
-      if (error) throw new ApiError(error.message, 400);
-      return {
-              id: 0,
-              data: payload.data,
-              pelotao: payload.pelotao,
-              distribuicoes: payload.distribuicoes,
-              responsavel: payload.responsavel,
-              assinatura: payload.assinatura,
-              criado_em: new Date().toISOString(),
-      };
-}
+async function criarRelatorio(payload: RelatorioInput): Promise<Relatorio> { const { data, error } = await supabase.rpc("criar_relatorio", { p_data: payload.data, p_pelotao: payload.pelotao, p_distribuicoes: payload.distribuicoes, p_responsavel: payload.responsavel, p_assinatura: payload.assinatura }); if (error) throw new ApiError(error.message, 400); return data as Relatorio; }
 
 export const api = {
       login,

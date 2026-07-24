@@ -118,7 +118,8 @@ export function SignaturePad({ onConfirm, onClear, confirmed, label }: Signature
                             <button type="button" className={modo === "imagem" ? "btn btn-primary" : "btn btn-ghost"} onClick={() => alternarModo("imagem")}>
                                         Anexar imagem (ex.: assinatura GOV.BR)
                             </button>
-                          )}
+                  </div>
+        )}
 
                     {modo === "desenho" && (
                             <div style={{ border: "1px dashed var(--color-line)", borderRadius: "var(--radius-sm)", background: "rgba(0,0,0,0.25)", position: "relative" }}>

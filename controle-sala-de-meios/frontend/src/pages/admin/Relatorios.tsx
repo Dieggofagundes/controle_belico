@@ -303,17 +303,9 @@ export function Relatorios() {
                 {r.finalizado && (
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginTop: 14 }}>
                     <div style={{ fontSize: 12.5, color: "var(--color-text-dim)" }}>
-                      Responsável da Sala de Meios:{" "}
-                      <strong style={{ color: "var(--color-text)" }}>{r.responsavel_sala_meios?.nome}</strong>
+                      <strong style={{ color: "var(--color-text)" }}>SALA DE MEIOS</strong>
                       <div style={{ fontSize: 11.5 }}>Finalizado em {new Date(r.finalizado_em || "").toLocaleString("pt-BR")}</div>
                     </div>
-                    {r.assinatura_sala_meios ? (
-                      <img
-                        src={r.assinatura_sala_meios}
-                        alt="Assinatura digital do Responsável da Sala de Meios"
-                        style={{ height: 40, background: "rgba(255,255,255,0.03)", borderRadius: 3, border: "1px solid var(--color-line)" }}
-                      />
-                    ) : null}
                   </div>
                 )}
 

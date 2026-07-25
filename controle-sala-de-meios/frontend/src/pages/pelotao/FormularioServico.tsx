@@ -36,7 +36,7 @@ function itensMunicaoVazio(): ItemMaterial[] {
 }
 
 function devolucaoVazia(): Devolucao {
-  return { data: "", comAlteracao: false, nomeComandante: "", assinaturaComandante: null, local: "" };
+  return { data: "", comAlteracao: false, observacao: "", local: "" };
 }
 
 export function FormularioServico() {
@@ -49,13 +49,13 @@ export function FormularioServico() {
   const [linhas, setLinhas] = useState<Distribuicao[]>([novaLinha()]);
   const [responsavel, setResponsavel] = useState<Responsavel>(responsavelVazio());
   const [assinatura, setAssinatura] = useState<string | null>(null);
+  const [comandante, setComandante] = useState<Responsavel>(responsavelVazio());
+  const [assinaturaComandante, setAssinaturaComandante] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   const [itensGeral, setItensGeral] = useState<ItemMaterial[]>(itensGeralVazio());
   const [itensMunicao, setItensMunicao] = useState<ItemMaterial[]>(itensMunicaoVazio());
   const [observacoesItens, setObservacoesItens] = useState("");
-
-  const [devolucao, setDevolucao] = useState<Devolucao>(devolucaoVazia());
 
   useEffect(() => {
     api
@@ -100,6 +100,16 @@ export function FormularioServico() {
     const p = policiais.find((x) => x.id === Number(policialId));
     if (!p) return;
     setResponsavel({ policial_id: p.id, nome_completo: p.nome_completo, nome_guerra: p.nome_guerra, matricula: p.matricula });
+  }
+
+  function selecionarComandante(policialId: string) {
+    if (!policialId) {
+      setComandante(responsavelVazio());
+      return;
+    }
+    const p = policiais.find((x) => x.id === Number(policialId));
+    if (!p) return;
+    setComandante({ policial_id: p.id, nome_completo: p.nome_completo, nome_guerra: p.nome_guerra, matricula: p.matricula });
   }
 
   function atualizarItemGeral(index: number, quantidade: string) {
@@ -159,6 +169,8 @@ export function FormularioServico() {
     }
     if (!responsavel.policial_id) return "Selecione o responsável pelo preenchimento.";
     if (!assinatura) return "Confirme a assinatura digital do responsável antes de enviar.";
+    if (!comandante.policial_id) return "Selecione o Comandante de Pelotão.";
+    if (!assinaturaComandante) return "Confirme a assinatura digital do Comandante de Pelotão antes de enviar.";
     return null;
   }
 
@@ -178,18 +190,21 @@ export function FormularioServico() {
         responsavel,
         assinatura,
         itens_viatura: { geral: itensGeral, municaoEspecial: itensMunicao, observacoesGerais: observacoesItens },
-        devolucao,
+        devolucao: devolucaoVazia(),
+        comandante,
+        assinatura_comandante: assinaturaComandante,
       });
       notify("Relatório salvo e enviado à Sala de Meios com sucesso.", "success");
       setLinhas([novaLinha()]);
       setResponsavel(responsavelVazio());
       setAssinatura(null);
+      setComandante(responsavelVazio());
+      setAssinaturaComandante(null);
       setPelotao(PELOTOES[0]);
       setData(new Date().toISOString().slice(0, 10));
       setItensGeral(itensGeralVazio());
       setItensMunicao(itensMunicaoVazio());
       setObservacoesItens("");
-      setDevolucao(devolucaoVazia());
     } catch (err) {
       notify(err instanceof ApiError ? err.message : "Erro ao enviar o relatório.", "error");
     } finally {
@@ -491,97 +506,85 @@ export function FormularioServico() {
             C · FECHAMENTO E ASSINATURA
           </h3>
 
-          <div className="field" style={{ marginBottom: 16, maxWidth: 420 }}>
-            <label>Responsável pelo Preenchimento (Sala de Meios)</label>
-            <select value={responsavel.policial_id ?? ""} onChange={(e) => selecionarResponsavel(e.target.value)} required>
-              <option value="">Selecione o responsável...</option>
-              {policiais.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nome_guerra} — {p.nome_completo}
-                </option>
-              ))}
-            </select>
-          </div>
+          <div className="grid-two-panels">
+            <div>
+              <div className="field" style={{ marginBottom: 16 }}>
+                <label>Responsável pelo Preenchimento (Sala de Meios)</label>
+                <select value={responsavel.policial_id ?? ""} onChange={(e) => selecionarResponsavel(e.target.value)} required>
+                  <option value="">Selecione o responsável...</option>
+                  {policiais.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome_guerra} — {p.nome_completo}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {responsavel.policial_id && (
-            <div className="grid-form-2" style={{ marginBottom: 20, maxWidth: 420 }}>
-              <div className="field">
-                <label>Nome Completo</label>
-                <input value={responsavel.nome_completo} readOnly />
-              </div>
-              <div className="field">
-                <label>Matrícula</label>
-                <input value={responsavel.matricula} readOnly style={{ fontFamily: "var(--font-mono)" }} />
-              </div>
+              {responsavel.policial_id && (
+                <div className="grid-form-2" style={{ marginBottom: 20 }}>
+                  <div className="field">
+                    <label>Nome Completo</label>
+                    <input value={responsavel.nome_completo} readOnly />
+                  </div>
+                  <div className="field">
+                    <label>Matrícula</label>
+                    <input value={responsavel.matricula} readOnly style={{ fontFamily: "var(--font-mono)" }} />
+                  </div>
+                </div>
+              )}
+
+              <SignaturePad
+                confirmed={!!assinatura}
+                onConfirm={(dataUrl) => setAssinatura(dataUrl)}
+                onClear={() => setAssinatura(null)}
+                label="Assinatura Digital do Responsável"
+              />
             </div>
-          )}
 
-          <div style={{ maxWidth: 500 }}>
-            <SignaturePad
-              confirmed={!!assinatura}
-              onConfirm={(dataUrl) => setAssinatura(dataUrl)}
-              onClear={() => setAssinatura(null)}
-              label="Assinatura Digital do Responsável"
-            />
+            <div>
+              <div className="field" style={{ marginBottom: 16 }}>
+                <label>Comandante de Pelotão</label>
+                <select value={comandante.policial_id ?? ""} onChange={(e) => selecionarComandante(e.target.value)} required>
+                  <option value="">Selecione o Comandante de Pelotão...</option>
+                  {policiais.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nome_guerra} — {p.nome_completo}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {comandante.policial_id && (
+                <div className="grid-form-2" style={{ marginBottom: 20 }}>
+                  <div className="field">
+                    <label>Nome Completo</label>
+                    <input value={comandante.nome_completo} readOnly />
+                  </div>
+                  <div className="field">
+                    <label>Matrícula</label>
+                    <input value={comandante.matricula} readOnly style={{ fontFamily: "var(--font-mono)" }} />
+                  </div>
+                </div>
+              )}
+
+              <SignaturePad
+                confirmed={!!assinaturaComandante}
+                onConfirm={(dataUrl) => setAssinaturaComandante(dataUrl)}
+                onClear={() => setAssinaturaComandante(null)}
+                label="Assinatura Digital do Comandante de Pelotão"
+              />
+            </div>
           </div>
         </section>
 
-        {/* D) Devolução */}
-        <section className="panel" style={{ padding: 24 }}>
-          <h3 style={{ fontSize: 14, marginBottom: 16 }} className="eyebrow">
+        <div className="panel" style={{ padding: 20, display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="eyebrow" style={{ color: "var(--color-text-faint)" }}>
             D · DEVOLUÇÃO PARA A SALA DE MEIOS
-          </h3>
-
-          <div className="field-inline-header" style={{ marginBottom: 16 }}>
-            <div className="field" style={{ width: 220 }}>
-              <label>Data da Devolução</label>
-              <input type="date" value={devolucao.data} onChange={(e) => setDevolucao({ ...devolucao, data: e.target.value })} />
-            </div>
-            <div className="field" style={{ width: 260 }}>
-              <label>Situação</label>
-              <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                  <input
-                    type="radio"
-                    name="comAlteracao"
-                    checked={!devolucao.comAlteracao}
-                    onChange={() => setDevolucao({ ...devolucao, comAlteracao: false })}
-                  />
-                  Sem alteração
-                </label>
-                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-                  <input
-                    type="radio"
-                    name="comAlteracao"
-                    checked={devolucao.comAlteracao}
-                    onChange={() => setDevolucao({ ...devolucao, comAlteracao: true })}
-                  />
-                  Com alteração
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid-form-2" style={{ marginBottom: 16, maxWidth: 500 }}>
-            <div className="field">
-              <label>Nome do Comandante</label>
-              <input value={devolucao.nomeComandante} onChange={(e) => setDevolucao({ ...devolucao, nomeComandante: e.target.value })} />
-            </div>
-            <div className="field">
-              <label>Local</label>
-              <input value={devolucao.local} onChange={(e) => setDevolucao({ ...devolucao, local: e.target.value })} />
-            </div>
-          </div>
-
-          <div style={{ maxWidth: 500 }}>
-            <SignaturePad
-              confirmed={!!devolucao.assinaturaComandante}
-              onConfirm={(dataUrl) => setDevolucao({ ...devolucao, assinaturaComandante: dataUrl })}
-              onClear={() => setDevolucao({ ...devolucao, assinaturaComandante: null })}
-              label="Assinatura Digital do Comandante"
-            />
-          </div>
-        </section>
+          </span>
+          <span style={{ fontSize: 12.5, color: "var(--color-text-dim)" }}>
+            Esta etapa será concluída pelo Administrador (Sala de Meios) no momento da finalização da cautela.
+          </span>
+        </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button type="submit" className="btn btn-primary" style={{ padding: "14px 32px", fontSize: 14 }} disabled={enviando}>

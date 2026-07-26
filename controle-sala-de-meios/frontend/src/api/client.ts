@@ -20,7 +20,7 @@ async function login(email: string, senha: string): Promise<AuthState> {
                   password: senha,
         });
         if (error || !data.session || !data.user) {
-                  throw new ApiError("Login ou senha inválidos.", 401);
+                  throw new ApiError("Login ou senha invÃ¡lidos.", 401);
         }
         const role = (data.user.user_metadata?.role as string) || "pelotao";
         const nome = (data.user.user_metadata?.nome as string) || data.user.email || "";
@@ -30,7 +30,7 @@ async function login(email: string, senha: string): Promise<AuthState> {
 async function listarPoliciais(): Promise<Policial[]> {
         const { data, error } = await supabase
           .from("policiais")
-          .select("id, nome_completo, nome_guerra, matricula")
+          .select("id, nome_completo, nome_guerra, matricula, pelotao")
           .order("nome_guerra", { ascending: true });
         if (error) throw new ApiError(error.message, 400);
         return data as Policial[];
@@ -40,15 +40,16 @@ async function criarPolicial(payload: {
         nome_completo: string;
         nome_guerra: string;
         matricula: string;
+        pelotao: string | null;
 }): Promise<Policial> {
         const { data, error } = await supabase
           .from("policiais")
           .insert(payload)
-          .select("id, nome_completo, nome_guerra, matricula")
+          .select("id, nome_completo, nome_guerra, matricula, pelotao")
           .single();
         if (error) {
                   if ((error as any).code === "23505") {
-                              throw new ApiError("Já existe um policial cadastrado com essa matrícula.", 409);
+                              throw new ApiError("JÃ¡ existe um policial cadastrado com essa matrÃ­cula.", 409);
                   }
                   throw new ApiError(error.message, 400);
         }

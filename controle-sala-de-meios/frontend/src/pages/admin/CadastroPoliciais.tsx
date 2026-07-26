@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../api/client";
 import type { Policial } from "../../types";
+import { PELOTOES_POLICIAL } from "../../types";
 import { useToast } from "../../context/ToastContext";
 
 export function CadastroPoliciais() {
@@ -13,6 +14,7 @@ export function CadastroPoliciais() {
   const [nomeCompleto, setNomeCompleto] = useState("");
   const [nomeGuerra, setNomeGuerra] = useState("");
   const [matricula, setMatricula] = useState("");
+  const [pelotao, setPelotao] = useState("");
 
   function carregar() {
     setLoading(true);
@@ -32,11 +34,13 @@ export function CadastroPoliciais() {
         nome_completo: nomeCompleto.trim(),
         nome_guerra: nomeGuerra.trim(),
         matricula: matricula.trim(),
+        pelotao: pelotao || null,
       });
       notify(`Policial ${nomeGuerra.trim()} cadastrado com sucesso.`, "success");
       setNomeCompleto("");
       setNomeGuerra("");
       setMatricula("");
+      setPelotao("");
       carregar();
     } catch (err) {
       notify(err instanceof ApiError ? err.message : "Erro ao cadastrar policial.", "error");
@@ -98,6 +102,18 @@ export function CadastroPoliciais() {
               required
             />
           </div>
+          <div className="field">
+            <label>Pelotão</label>
+            <select
+              value={pelotao}
+              onChange={(e) => setPelotao(e.target.value)}
+            >
+              <option value="">Selecione...</option>
+              {PELOTOES_POLICIAL.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
           <button type="submit" className="btn btn-primary" style={{ justifyContent: "center" }} disabled={salvando}>
             {salvando ? "Salvando..." : "+ Cadastrar Policial"}
           </button>
@@ -137,6 +153,7 @@ export function CadastroPoliciais() {
                   <th style={{ paddingBottom: 10 }}>Nome de Guerra</th>
                   <th style={{ paddingBottom: 10 }}>Nome Completo</th>
                   <th style={{ paddingBottom: 10 }}>Matrícula</th>
+                  <th style={{ paddingBottom: 10 }}>Pelotão</th>
                   <th style={{ paddingBottom: 10 }}></th>
                 </tr>
               </thead>
@@ -148,6 +165,7 @@ export function CadastroPoliciais() {
                     <td style={{ padding: "10px 0", fontFamily: "var(--font-mono)", color: "var(--color-text-dim)" }}>
                       {p.matricula}
                     </td>
+                    <td style={{ padding: "10px 0", color: "var(--color-text-dim)" }}>{p.pelotao || "-"}</td>
                     <td style={{ padding: "10px 0", textAlign: "right" }}>
                       <button className="btn btn-danger" style={{ padding: "5px 12px", fontSize: 11 }} onClick={() => handleRemover(p.id, p.nome_guerra)}>
                         Remover

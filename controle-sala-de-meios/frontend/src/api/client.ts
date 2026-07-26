@@ -20,7 +20,7 @@ async function login(email: string, senha: string): Promise<AuthState> {
                   password: senha,
         });
         if (error || !data.session || !data.user) {
-                  throw new ApiError("Login ou senha invÃ¡lidos.", 401);
+                  throw new ApiError("Login ou senha inválidos.", 401);
         }
         const role = (data.user.user_metadata?.role as string) || "pelotao";
         const nome = (data.user.user_metadata?.nome as string) || data.user.email || "";
@@ -49,7 +49,7 @@ async function criarPolicial(payload: {
           .single();
         if (error) {
                   if ((error as any).code === "23505") {
-                              throw new ApiError("JÃ¡ existe um policial cadastrado com essa matrÃ­cula.", 409);
+                              throw new ApiError("Já existe um policial cadastrado com essa matrícula.", 409);
                   }
                   throw new ApiError(error.message, 400);
         }

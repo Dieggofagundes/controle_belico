@@ -1,6 +1,7 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import type { Role } from "../types";
+import { rotaParaRole } from "../types";
 
 export function ProtectedRoute({
   role,
@@ -12,7 +13,7 @@ export function ProtectedRoute({
   const { auth } = useAuth();
 
   if (!auth) return <Navigate to="/login" replace />;
-  if (auth.role !== role) return <Navigate to={auth.role === "admin" ? "/admin" : "/servico"} replace />;
+  if (auth.role !== role) return <Navigate to={rotaParaRole(auth.role)} replace />;
 
   return <>{children}</>;
 }

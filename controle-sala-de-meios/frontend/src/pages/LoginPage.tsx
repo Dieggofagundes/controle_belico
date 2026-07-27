@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Emblem } from "../components/Emblem";
 import { ApiError } from "../api/client";
+import { rotaParaRole } from "../types";
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -18,7 +19,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const result = await login(email, senha);
-      navigate(result.role === "admin" ? "/admin" : "/servico");
+        navigate(rotaParaRole(result.role));
     } catch (err) {
       if (err instanceof ApiError) {
         setErro(err.message);
@@ -43,12 +44,12 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="field">
-            <label htmlFor="email">Login</label>
+            <label htmlFor="email">Matricula</label>
             <input
               id="email"
-              type="email"
+              type="text"
               autoComplete="username"
-              placeholder="usuario@caema.gov"
+                        placeholder="Ex: 30375352"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

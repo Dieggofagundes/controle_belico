@@ -14,17 +14,20 @@ class ApiError extends Error {
         }
 }
 
-async function login(email: string, senha: string): Promise<AuthState> {
-        const { data, error } = await supabase.auth.signInWithPassword({
-                  email: email.trim().toLowerCase(),
-                  password: senha,
-        });
-        if (error || !data.session || !data.user) {
-                  throw new ApiError("Login ou senha inválidos.", 401);
-        }
-        const role = (data.user.user_metadata?.role as string) || "pelotao";
-        const nome = (data.user.user_metadata?.nome as string) || data.user.email || "";
-        return { token: data.session.access_token, role: role as AuthState["role"], nome };
+async function login(identificador: string, senha: string): Promise<AuthState> {
+        	const valor = identificador.trim();
+        	const email = valor.includes("@") ? valor.toLowerCase() : `${valor}@efetivo.pm`;
+        	const { data, error } = await supabase.auth.signInWithPassword({
+                        		email,
+                        		password: senha,
+                });
+        	if (error || !data.session || !data.user) {
+                        		throw new ApiError("Login ou senha inválidos.", 401);
+                }
+        	const role = (data.user.user_metadata?.role as string) || "pelotao";
+        	const nome = (data.user.user_metadata?.nome as string) || data.user.email || "";
+        	const matricula = (data.user.user_metadata?.matricula as string) || undefined;
+        	return { token: data.session.access_token, role: role as AuthState["role"], nome, matricula };
 }
 
 async function listarPoliciais(): Promise<Policial[]> {

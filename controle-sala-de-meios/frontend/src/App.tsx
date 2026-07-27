@@ -8,6 +8,8 @@ import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { CadastroPoliciais } from "./pages/admin/CadastroPoliciais";
 import { Relatorios } from "./pages/admin/Relatorios";
 import { FormularioServico } from "./pages/pelotao/FormularioServico";
+import { MeuPerfil } from "./pages/policial/MeuPerfil";
+import { rotaParaRole } from "./types";
 
 const ADMIN_NAV = [
   { to: "/admin", label: "Visão Geral" },
@@ -20,7 +22,7 @@ const PELOTAO_NAV = [{ to: "/servico", label: "Formulário de Cautela" }];
 function RaizAutenticada() {
   const { auth } = useAuth();
   if (!auth) return <Navigate to="/login" replace />;
-  return <Navigate to={auth.role === "admin" ? "/admin" : "/servico"} replace />;
+  return <Navigate to={rotaParaRole(auth.role)} replace />;
 }
 
 export default function App() {
@@ -73,6 +75,14 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+
+                      <Route
+                                    path="/policial"
+                                    element={
+                                                    <ProtectedRoute role="policial">
+                                                    <MeuPerfil /></ProtectedRoute>
+                                    }
+                        />
 
             <Route path="/" element={<RaizAutenticada />} />
             <Route path="*" element={<RaizAutenticada />} />

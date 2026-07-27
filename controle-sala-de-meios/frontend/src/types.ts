@@ -1,9 +1,15 @@
-export type Role = "admin" | "pelotao";
-
+export type Role = "admin" | "pelotao" | "policial";
 export interface AuthState {
       token: string;
       role: Role;
       nome: string;
+      matricula?: string;
+}
+
+export function rotaParaRole(role: Role): string {
+      if (role === "admin") return "/admin";
+      if (role === "pelotao") return "/servico";
+      return "/policial";
 }
 
 export interface Policial {

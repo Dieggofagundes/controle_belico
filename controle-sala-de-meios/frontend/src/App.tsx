@@ -57,7 +57,7 @@ export default function App() {
             <Route
               path="/admin/relatorios"
               element={
-                <ProtectedRoute role={["admin", "policial"]}">
+                <ProtectedRoute role={["admin", "policial"]}>
                   <Layout nav={ADMIN_NAV}>
                     <Relatorios />
                   </Layout>

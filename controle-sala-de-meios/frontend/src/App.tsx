@@ -9,6 +9,7 @@ import { CadastroPoliciais } from "./pages/admin/CadastroPoliciais";
 import { Relatorios } from "./pages/admin/Relatorios";
 import { FormularioServico } from "./pages/pelotao/FormularioServico";
 import { MeuPerfil } from "./pages/policial/MeuPerfil";
+import { AdminPermissoes } from "./pages/policial/AdminPermissoes";
 import { rotaParaRole } from "./types";
 
 const ADMIN_NAV = [
@@ -81,6 +82,15 @@ export default function App() {
                                                     <MeuPerfil /></ProtectedRoute>
                                     }
                         />
+
+                        <Route
+                                        path="/admin/permissoes"
+                                        element={
+                                                          <ProtectedRoute role="policial">
+                                                                            <AdminPermissoes />
+                                                          </ProtectedRoute>
+                          }
+                                    />
 
             <Route path="/" element={<RaizAutenticada />} />
             <Route path="*" element={<RaizAutenticada />} />

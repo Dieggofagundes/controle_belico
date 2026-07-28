@@ -7,13 +7,12 @@ export function ProtectedRoute({
   role,
   children,
 }: {
-  role: Role;
-  children: React.ReactNode;
+  role: Role | Role[];  children: React.ReactNode;
 }) {
   const { auth } = useAuth();
 
   if (!auth) return <Navigate to="/login" replace />;
-  if (auth.role !== role) return <Navigate to={rotaParaRole(auth.role)} replace />;
-
+  const rolesPermitidas = Array.isArray(role) ? role : [role];
+    if (!rolesPermitidas.includes(auth.role)) return <Navigate to={rotaParaRole(auth.role)} replace />;
   return <>{children}</>;
 }

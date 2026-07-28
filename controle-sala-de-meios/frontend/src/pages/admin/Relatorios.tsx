@@ -19,6 +19,8 @@ export function Relatorios() {
   const [relatorios, setRelatorios] = useState<Relatorio[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroData, setFiltroData] = useState("");
+  const [filtroDataInicio, setFiltroDataInicio] = useState("");
+  const [filtroDataFim, setFiltroDataFim] = useState("");
   const [filtroPelotao, setFiltroPelotao] = useState("");
   const [expandido, setExpandido] = useState<number | null>(null);
 
@@ -37,12 +39,12 @@ export function Relatorios() {
   function carregar() {
     setLoading(true);
     api
-      .listarRelatorios({ data: filtroData || undefined, pelotao: filtroPelotao || undefined })
-      .then(setRelatorios)
+    .listarRelatorios({ data: filtroData || undefined, dataInicio: filtroDataInicio || undefined, dataFim: filtroDataFim || undefined, pelotao: filtroPelotao || undefined })
+                        .then(setRelatorios)
       .finally(() => setLoading(false));
   }
 
-  useEffect(carregar, [filtroData, filtroPelotao]);
+  useEffect(carregar, [filtroData, filtroDataInicio, filtroDataFim, filtroPelotao]);
 
   function abrirFinalizacao(r: Relatorio) {
     setExpandido(r.id);
@@ -155,6 +157,14 @@ export function Relatorios() {
           <label>Filtrar por Data</label>
           <input type="date" value={filtroData} onChange={(e) => setFiltroData(e.target.value)} />
         </div>
+        <div className="field" style={{ width: 170 }}>
+          <label>Data Início (Período)</label>
+          <input type="date" value={filtroDataInicio} onChange={(e) => setFiltroDataInicio(e.target.value)} />
+        </div>
+        <div className="field" style={{ width: 170 }}>
+          <label>Data Fim (Período)</label>
+          <input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} />
+        </div>
         <div className="field" style={{ width: 220 }}>
           <label>Filtrar por Pelotão</label>
           <select value={filtroPelotao} onChange={(e) => setFiltroPelotao(e.target.value)}>
@@ -166,11 +176,13 @@ export function Relatorios() {
             ))}
           </select>
         </div>
-        {(filtroData || filtroPelotao) && (
+        {(filtroData || filtroDataInicio || filtroDataFim || filtroPelotao) && (
           <button
             className="btn btn-ghost"
             onClick={() => {
               setFiltroData("");
+              setFiltroDataInicio("");
+              setFiltroDataFim("");
               setFiltroPelotao("");
             }}
           >

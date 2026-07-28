@@ -111,6 +111,53 @@ async function finalizarRelatorio(payload: {
         return data as Relatorio;
 }
 
+async function listarPendenciasComandante(): Promise<Relatorio[]> {
+        const { data, error } = await supabase.rpc("listar_pendencias_comandante");
+        if (error) throw new ApiError(error.message, 400);
+        return data as Relatorio[];
+}
+
+async function listarCautelasComandanteAssinadas(): Promise<Relatorio[]> {
+        const { data, error } = await supabase.rpc("listar_cautelas_comandante_assinadas");
+        if (error) throw new ApiError(error.message, 400);
+        return data as Relatorio[];
+}
+
+async function assinarComoComandante(id: number, assinatura: string): Promise<Relatorio> {
+        const { data, error } = await supabase.rpc("assinar_como_comandante", { p_id: id, p_assinatura: assinatura });
+        if (error) throw new ApiError(error.message, 400);
+        return data as Relatorio;
+}
+
+async function obterMeuPerfil(): Promise<Policial> {
+        const { data, error } = await supabase.rpc("obter_meu_perfil");
+        if (error) throw new ApiError(error.message, 400);
+        return data as Policial;
+}
+
+async function atualizarMeuContato(telefone: string, email: string): Promise<Policial> {
+        const { data, error } = await supabase.rpc("atualizar_meu_contato", { p_telefone: telefone, p_email: email });
+        if (error) throw new ApiError(error.message, 400);
+        return data as Policial;
+}
+
+async function listarPoliciaisAdmin(): Promise<Policial[]> {
+        const { data, error } = await supabase.rpc("listar_policiais_admin");
+        if (error) throw new ApiError(error.message, 400);
+        return data as Policial[];
+}
+
+async function definirAdmin(matricula: string, isAdmin: boolean): Promise<Policial> {
+        const { data, error } = await supabase.rpc("definir_admin", { p_matricula: matricula, p_is_admin: isAdmin });
+        if (error) throw new ApiError(error.message, 400);
+        return data as Policial;
+}
+
+async function alterarSenha(novaSenha: string): Promise<void> {
+        const { error } = await supabase.auth.updateUser({ password: novaSenha });
+        if (error) throw new ApiError(error.message, 400);
+}
+
 export const api = {
         login,
         listarPoliciais,
@@ -119,6 +166,14 @@ export const api = {
         listarRelatorios,
         criarRelatorio,
         finalizarRelatorio,
+        listarPendenciasComandante,
+        listarCautelasComandanteAssinadas,
+        assinarComoComandante,
+        obterMeuPerfil,
+        atualizarMeuContato,
+        listarPoliciaisAdmin,
+        definirAdmin,
+        alterarSenha,
 };
 
 export { ApiError };

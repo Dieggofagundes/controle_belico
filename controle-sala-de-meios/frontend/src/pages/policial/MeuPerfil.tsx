@@ -3,9 +3,11 @@ import { useAuth } from "../../context/AuthContext";
 import { api } from "../../api/client";
 import { Emblem } from "../../components/Emblem";
 import type { Policial } from "../../types";
+import { useNavigate } from "react-router-dom";
 
 export function MeuPerfil() {
   	const { auth, logout } = useAuth();
+	const navigate = useNavigate();
   	const [policial, setPolicial] = useState<Policial | null>(null);
   	const [erro, setErro] = useState<string | null>(null);
   	const [loading, setLoading] = useState(true);
@@ -67,6 +69,7 @@ export function MeuPerfil() {
           			erro ? React.createElement("p", { style: { color: "#f0d6d6", textAlign: "center" } }, erro) : null,
           			blocoDados,
           			mensagemVazia,
+				React.createElement("button", { className: "btn btn-primary", style: { marginTop: 24 }, onClick: () => navigate("/servico") }, "Formulário de Cautela"),
           			React.createElement(
                   				"button",
                   { className: "btn btn-primary", style: { marginTop: 24 }, onClick: logout },

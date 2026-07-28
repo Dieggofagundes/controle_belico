@@ -17,8 +17,7 @@ const ADMIN_NAV = [
   { to: "/admin/relatorios", label: "Relatórios" },
 ];
 
-const PELOTAO_NAV = [{ to: "/servico", label: "Formulário de Cautela" }];
-
+const PELOTAO_NAV = [{ to: "/servico", label: "Formulário de Cautela" }, { to: "/policial", label: "Meu Perfil" }];
 function RaizAutenticada() {
   const { auth } = useAuth();
   if (!auth) return <Navigate to="/login" replace />;
@@ -68,8 +67,7 @@ export default function App() {
             <Route
               path="/servico"
               element={
-                <ProtectedRoute role="pelotao">
-                  <Layout nav={PELOTAO_NAV}>
+              <ProtectedRoute role={["pelotao", "policial"]}>                  <Layout nav={PELOTAO_NAV}>
                     <FormularioServico />
                   </Layout>
                 </ProtectedRoute>

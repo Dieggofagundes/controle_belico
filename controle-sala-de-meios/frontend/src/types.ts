@@ -18,6 +18,9 @@ export interface Policial {
       nome_guerra: string;
       matricula: string;
       pelotao: string | null;
+        telefone: string | null;
+        email_recuperacao: string | null;
+        is_admin: boolean;
 }
 
 export const PELOTOES = [
@@ -28,6 +31,7 @@ export const PELOTOES = [
       "Extra",
       "Operação extra",
       "ADM",
+        "SOINT",
     ] as const;
 
 export type Pelotao = (typeof PELOTOES)[number];

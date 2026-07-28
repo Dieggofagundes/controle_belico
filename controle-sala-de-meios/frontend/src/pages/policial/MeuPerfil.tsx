@@ -1,14 +1,23 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useToast } from "../../context/ToastContext";
 import { api, ApiError } from "../../api/client";
 import { Emblem } from "../../components/Emblem";
 import { SignaturePad } from "../../components/SignaturePad";
-import type { Policial, Relatorio, Devolucao } from "../../types";
+import { RelatorioDocumento } from "../../components/RelatorioDocumento";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import type { Policial, Relatorio, Devolucao, Responsavel } from "../../types";
+
+const e = React.createElement;
 
 function devolucaoVazia(): Devolucao {
 	  return { data: new Date().toISOString().slice(0, 10), comAlteracao: false, observacao: "", local: "" };
+}
+
+function responsavelVazio(): Responsavel {
+	  return { policial_id: null, nome_completo: "", nome_guerra: "", matricula: "" };
 }
 
 export function MeuPerfil() {
@@ -28,12 +37,17 @@ export function MeuPerfil() {
 	  const [confirmarSenha, setConfirmarSenha] = useState("");
 	  const [salvandoSenha, setSalvandoSenha] = useState(false);
 
-  const [pendencias, setPendencias] = useState<Relatorio[]>([]);
+  const [policiais, setPoliciais] = useState<Policial[]>([]);
+
+const [pendencias, setPendencias] = useState<Relatorio[]>([]);
 	  const [assinadas, setAssinadas] = useState<Relatorio[]>([]);
+	  const [pendenciasSala, setPendenciasSala] = useState<Relatorio[]>([]);
+	  const [finalizadasSala, setFinalizadasSala] = useState<Relatorio[]>([]);
 	  const [carregandoPendencias, setCarregandoPendencias] = useState(true);
 
   const [assinandoId, setAssinandoId] = useState<number | null>(null);
 	  const [assinaturaComandante, setAssinaturaComandante] = useState<string | null>(null);
+	  const [salaSelecionada, setSalaSelecionada] = useState<Responsavel>(responsavelVazio());
 	  const [salvandoAssinatura, setSalvandoAssinatura] = useState(false);
 
   const [finalizandoId, setFinalizandoId] = useState<number | null>(null);
@@ -41,50 +55,65 @@ export function MeuPerfil() {
 	  const [assinaturaSala, setAssinaturaSala] = useState<string | null>(null);
 	  const [salvandoFinalizacao, setSalvandoFinalizacao] = useState(false);
 
-  useEffect(() => {
-	      let ativo = true;
-	      api
-	        .obterMeuPerfil()
-	        .then((p) => {
-				        if (!ativo) return;
-				        setPerfil(p);
-				        setTelefone(p?.telefone || "");
-				        setEmailRecuperacao(p?.email_recuperacao || "");
-			})
-	        .catch(() => ativo && setErro("Não foi possível carregar seus dados."))
-	        .finally(() => ativo && setLoading(false));
-	      return () => {
-			        ativo = false;
-		  };
-  }, [auth?.matricula]);
+  const [documentoAtivo, setDocumentoAtivo] = useState<Relatorio | null>(null);
+	  const [gerandoPdf, setGerandoPdf] = useState(false);
+	  const docRef = useRef<HTMLDivElement>(null);
 
-  function carregarPendencias() {
-	      setCarregandoPendencias(true);
-	      Promise.all([api.listarPendenciasComandante(), api.listarCautelasComandanteAssinadas()])
-	        .then(([pend, assin]) => {
-				        setPendencias(pend);
-				        setAssinadas(assin);
-			})
-	        .catch(() => {})
-	        .finally(() => setCarregandoPendencias(false));
-  }
+useEffect(() => {
+	    let ativo = true;
+	    api
+	      .obterMeuPerfil()
+	      .then((p) => {
+			          if (!ativo) return;
+			          setPerfil(p);
+			          setTelefone(p?.telefone || "");
+			          setEmailRecuperacao(p?.email_recuperacao || "");
+		  })
+	      .catch(() => ativo && setErro("Nao foi possivel carregar seus dados."))
+	      .finally(() => ativo && setLoading(false));
+	    return () => {
+			      ativo = false;
+		};
+}, [auth?.matricula]);
+
+  useEffect(() => {
+	      api.listarPoliciais().then(setPoliciais).catch(() => {});
+  }, []);
+
+function carregarPendencias() {
+	    setCarregandoPendencias(true);
+	    Promise.all([
+			      api.listarPendenciasComandante(),
+			      api.listarCautelasComandanteAssinadas(),
+			      api.listarPendenciasSalaMeios(),
+			      api.listarCautelasSalaMeiosFinalizadas(),
+			    ])
+	      .then(([pend, assin, pendSala, finSala]) => {
+			          setPendencias(pend);
+			          setAssinadas(assin);
+			          setPendenciasSala(pendSala);
+			          setFinalizadasSala(finSala);
+		  })
+	      .catch(() => {})
+	      .finally(() => setCarregandoPendencias(false));
+}
 
   useEffect(() => {
 	      carregarPendencias();
   }, []);
 
-  async function salvarContato() {
-	      setSalvandoContato(true);
-	      try {
-			        const atualizado = await api.atualizarMeuContato(telefone.trim(), emailRecuperacao.trim());
-			        setPerfil(atualizado);
-			        notify("Dados de contato atualizados com sucesso.", "success");
-		  } catch (err) {
-			        notify(err instanceof ApiError ? err.message : "Erro ao salvar contato.", "error");
-		  } finally {
-			        setSalvandoContato(false);
-		  }
-  }
+async function salvarContato() {
+	    setSalvandoContato(true);
+	    try {
+			      const atualizado = await api.atualizarMeuContato(telefone.trim(), emailRecuperacao.trim());
+			      setPerfil(atualizado);
+			      notify("Dados de contato atualizados com sucesso.", "success");
+		} catch (err) {
+			      notify(err instanceof ApiError ? err.message : "Erro ao salvar contato.", "error");
+		} finally {
+			      setSalvandoContato(false);
+		}
+}
 
   async function salvarSenha() {
 	      if (!novaSenha || novaSenha.length < 6) {
@@ -92,7 +121,7 @@ export function MeuPerfil() {
 			        return;
 		  }
 	      if (novaSenha !== confirmarSenha) {
-			        notify("As senhas não coincidem.", "error");
+			        notify("As senhas nao coincidem.", "error");
 			        return;
 		  }
 	      setSalvandoSenha(true);
@@ -108,43 +137,59 @@ export function MeuPerfil() {
 		  }
   }
 
-  function abrirAssinatura(id: number) {
-	      setAssinandoId(id);
-	      setAssinaturaComandante(null);
-  }
+function abrirAssinatura(id: number) {
+	    setAssinandoId(id);
+	    setAssinaturaComandante(null);
+	    setSalaSelecionada(responsavelVazio());
+}
 
-  async function confirmarAssinatura(id: number) {
-	      if (!assinaturaComandante) {
-			        notify("Confirme sua assinatura digital.", "error");
+  function selecionarSala(policialId: string) {
+	      if (!policialId) {
+			        setSalaSelecionada(responsavelVazio());
 			        return;
 		  }
-	      setSalvandoAssinatura(true);
-	      try {
-			        await api.assinarComoComandante(id, assinaturaComandante);
-			        notify("Cautela assinada com sucesso.", "success");
-			        setAssinandoId(null);
-			        setAssinaturaComandante(null);
-			        carregarPendencias();
-		  } catch (err) {
-			        notify(err instanceof ApiError ? err.message : "Erro ao assinar.", "error");
-		  } finally {
-			        setSalvandoAssinatura(false);
-		  }
+	      const p = policiais.find((x) => x.id === Number(policialId));
+	      if (!p) return;
+	      setSalaSelecionada({ policial_id: p.id, nome_completo: p.nome_completo, nome_guerra: p.nome_guerra, matricula: p.matricula });
   }
 
-  function abrirFinalizacao(item: Relatorio) {
-	      setFinalizandoId(item.id);
-	      setDevolucao(item.devolucao && item.devolucao.data ? { ...item.devolucao, observacao: item.devolucao.observacao || "" } : devolucaoVazia());
-	      setAssinaturaSala(null);
-  }
+async function confirmarAssinatura(id: number) {
+	    if (!assinaturaComandante) {
+			      notify("Confirme sua assinatura digital.", "error");
+			      return;
+		}
+	    if (!salaSelecionada.matricula) {
+			      notify("Selecione o responsavel da Sala de Meios que ira finalizar esta cautela.", "error");
+			      return;
+		}
+	    setSalvandoAssinatura(true);
+	    try {
+			      await api.assinarComoComandante(id, assinaturaComandante, salaSelecionada);
+			      notify("Cautela assinada com sucesso. Documento encaminhado para a Sala de Meios.", "success");
+			      setAssinandoId(null);
+			      setAssinaturaComandante(null);
+			      setSalaSelecionada(responsavelVazio());
+			      carregarPendencias();
+		} catch (err) {
+			      notify(err instanceof ApiError ? err.message : "Erro ao assinar.", "error");
+		} finally {
+			      setSalvandoAssinatura(false);
+		}
+}
+
+function abrirFinalizacao(item: Relatorio) {
+	    setFinalizandoId(item.id);
+	    setDevolucao(item.devolucao && item.devolucao.data ? { ...item.devolucao, observacao: item.devolucao.observacao || "" } : devolucaoVazia());
+	    setAssinaturaSala(null);
+}
 
   async function confirmarFinalizacao(item: Relatorio) {
 	      if (!devolucao.data) {
-			        notify("Informe a data da devolução.", "error");
+			        notify("Informe a data da devolucao.", "error");
 			        return;
 		  }
 	      if (devolucao.comAlteracao && !devolucao.observacao.trim()) {
-			        notify("Descreva a observação da alteração constatada.", "error");
+			        notify("Descreva a observacao da alteracao constatada.", "error");
 			        return;
 		  }
 	      if (!assinaturaSala) {
@@ -159,7 +204,7 @@ export function MeuPerfil() {
 						        responsavel: item.responsavel,
 						        itens_viatura: item.itens_viatura,
 						        devolucao,
-						        responsavel_sala_meios: { nome: `${auth?.nome || ""}` },
+						        responsavel_sala_meios: { nome: auth?.nome || "", matricula: auth?.matricula || "" },
 						        assinatura_sala_meios: assinaturaSala,
 					});
 			        notify("Cautela finalizada com sucesso.", "success");
@@ -172,324 +217,309 @@ export function MeuPerfil() {
 		  }
   }
 
-  const linhaNomeGuerra = React.createElement("div", { key: "ng" }, React.createElement("strong", null, "Nome de guerra: "), perfil?.nome_guerra);
-	  const linhaNomeCompleto = React.createElement("div", { key: "nc" }, React.createElement("strong", null, "Nome completo: "), perfil?.nome_completo);
-	  const linhaMatricula = React.createElement("div", { key: "mt" }, React.createElement("strong", null, "Matrícula: "), perfil?.matricula);
-	  const linhaPelotao = React.createElement("div", { key: "pl" }, React.createElement("strong", null, "Pelotão: "), perfil?.pelotao || "Não informado");
+async function baixarPdf() {
+	    if (!docRef.current || !documentoAtivo) return;
+	    setGerandoPdf(true);
+	    try {
+			      const canvas = await html2canvas(docRef.current, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+			      const imgData = canvas.toDataURL("image/png");
+			      const pdf = new jsPDF("p", "pt", "a4");
+			      const pageWidth = pdf.internal.pageSize.getWidth();
+			      const pageHeight = pdf.internal.pageSize.getHeight();
+			      const imgWidth = pageWidth;
+			      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+			      let heightLeft = imgHeight;
+			      let position = 0;
+			      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+			      heightLeft -= pageHeight;
+			      while (heightLeft > 0) {
+					          position = heightLeft - imgHeight;
+					          pdf.addPage();
+					          pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+					          heightLeft -= pageHeight;
+				  }
+			      const nomeArquivo = `cautela-${documentoAtivo.data}-${documentoAtivo.pelotao}.pdf`.replace(/[^a-zA-Z0-9.-]+/g, "_");
+			      pdf.save(nomeArquivo);
+			      notify("PDF gerado com sucesso.", "success");
+		} catch (err) {
+			      notify("Erro ao gerar o PDF.", "error");
+		} finally {
+			      setGerandoPdf(false);
+		}
+}
 
-  const blocoDados = perfil
-	    ? React.createElement(
-			        "div",
-			{ style: { display: "flex", flexDirection: "column", gap: 12 } },
-			        linhaNomeGuerra,
-			        linhaNomeCompleto,
-			        linhaMatricula,
-			        linhaPelotao
-			      )
-	      : null;
-
-  const mensagemVazia =
-	      !loading && !perfil && !erro
-	      ? React.createElement("p", { style: { textAlign: "center" } }, "Nenhum cadastro encontrado para esta matrícula.")
-	        : null;
-
-  const blocoContato = perfil
-	    ? React.createElement(
-			        "div",
-			{ className: "panel", style: { padding: 20, marginTop: 24, width: "100%" } },
-			        React.createElement("h3", { style: { fontSize: 14, marginBottom: 14 } }, "Contato para Recuperação de Senha"),
-			        React.createElement(
-						          "div",
-						{ className: "field", style: { marginBottom: 12 } },
-						          React.createElement("label", null, "Telefone"),
-						          React.createElement("input", {
-									              value: telefone,
-									              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTelefone(e.target.value),
-									              placeholder: "Ex: (99) 99999-9999"
-								  })
-						        ),
-			        React.createElement(
-						          "div",
-						{ className: "field", style: { marginBottom: 14 } },
-						          React.createElement("label", null, "E-mail"),
-						          React.createElement("input", {
-									              value: emailRecuperacao,
-									              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setEmailRecuperacao(e.target.value),
-									              placeholder: "seuemail@exemplo.com"
-								  })
-						        ),
-			        React.createElement(
-						          "button",
-						{ className: "btn btn-primary", onClick: salvarContato, disabled: salvandoContato },
-						          salvandoContato ? "Salvando..." : "Salvar Contato"
-						        )
-			      )
-	      : null;
-
-  const blocoSenha = React.createElement(
-	      "div",
-	  { className: "panel", style: { padding: 20, marginTop: 20, width: "100%" } },
-	      React.createElement("h3", { style: { fontSize: 14, marginBottom: 14 } }, "Alterar Senha"),
-	      React.createElement(
-			        "div",
-			  { className: "field", style: { marginBottom: 12 } },
-			        React.createElement("label", null, "Nova Senha"),
-			        React.createElement("input", {
-						        type: "password",
-						        value: novaSenha,
-						        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNovaSenha(e.target.value),
-						        placeholder: "Nova senha"
-					})
-			      ),
-	      React.createElement(
-			        "div",
-			  { className: "field", style: { marginBottom: 14 } },
-			        React.createElement("label", null, "Confirmar Nova Senha"),
-			        React.createElement("input", {
-						        type: "password",
-						        value: confirmarSenha,
-						        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setConfirmarSenha(e.target.value),
-						        placeholder: "Confirme a nova senha"
-					})
-			      ),
-	      React.createElement(
-			        "button",
-			  { className: "btn btn-primary", onClick: salvarSenha, disabled: salvandoSenha },
-			        salvandoSenha ? "Salvando..." : "Alterar Senha"
-			      )
-	    );
-
-  const blocoAdmin = perfil?.is_admin
-	    ? React.createElement(
-			        "div",
-			{ className: "panel", style: { padding: 20, marginTop: 20, width: "100%" } },
-			        React.createElement("h3", { style: { fontSize: 14, marginBottom: 14 } }, "Administração"),
-			        React.createElement(
-						          "button",
-						{ className: "btn btn-primary", onClick: () => navigate("/admin/permissoes") },
-						          "Gerenciar Permissões de Admin"
-						        )
-			      )
-	      : null;
-
-  function renderPendenciaItem(item: Relatorio) {
-	      const info = React.createElement(
-			        "div",
-			  { style: { fontSize: 12.5, color: "var(--color-text-dim)", marginBottom: 8 } },
-			        `${new Date(item.data + "T00:00:00").toLocaleDateString("pt-BR")} — ${item.pelotao} — Responsável: ${item.responsavel.nome_guerra}`
-			      );
-
-	    const botaoAssinar = React.createElement(
-			      "button",
-			{ className: "btn btn-primary", onClick: () => abrirAssinatura(item.id) },
-			      "Assinar Cautela"
-			    );
-
-	    const painelAssinatura =
-			      assinandoId === item.id
-	          ? React.createElement(
-				              "div",
-				  { style: { marginTop: 14 } },
-				              React.createElement(SignaturePad, {
-								                confirmed: !!assinaturaComandante,
-								                onConfirm: (dataUrl: string) => setAssinaturaComandante(dataUrl),
-								                onClear: () => setAssinaturaComandante(null),
-								                label: "Assinatura Digital do Comandante de Pelotão"
-							  }),
-				              React.createElement(
-								                "div",
-								  { style: { display: "flex", gap: 10, marginTop: 12 } },
-								                React.createElement(
-													                "button",
-													{ className: "btn btn-ghost", onClick: () => setAssinandoId(null), disabled: salvandoAssinatura },
-													                "Cancelar"
-													              ),
-								                React.createElement(
-													                "button",
-													{ className: "btn btn-primary", onClick: () => confirmarAssinatura(item.id), disabled: salvandoAssinatura },
-													                salvandoAssinatura ? "Salvando..." : "Confirmar Assinatura"
-													              )
-								              )
-				            )
-			        : null;
-
-	    return React.createElement(
+function renderFinalizacaoForm(item: Relatorio) {
+	    return e(
 			      "div",
-			{ key: `pend-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
-			      info,
-			      assinandoId === item.id ? painelAssinatura : botaoAssinar
+			{ style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 12 } },
+			      e("div", { className: "field" },
+					        e("label", null, "Data da Devolucao"),
+					        e("input", { type: "date", value: devolucao.data, onChange: (ev: any) => setDevolucao({ ...devolucao, data: ev.target.value }) })
+					      ),
+			      e("div", { style: { display: "flex", gap: 16 } },
+					        e("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 } },
+							            e("input", { type: "radio", checked: !devolucao.comAlteracao, onChange: () => setDevolucao({ ...devolucao, comAlteracao: false }) }),
+							            "Sem alteracao"
+							          ),
+					        e("label", { style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 } },
+							            e("input", { type: "radio", checked: devolucao.comAlteracao, onChange: () => setDevolucao({ ...devolucao, comAlteracao: true }) }),
+							            "Com alteracao"
+							          )
+					      ),
+			      devolucao.comAlteracao ? e("div", { className: "field" },
+											         e("label", null, "Observacao da Alteracao"),
+											         e("textarea", { rows: 3, value: devolucao.observacao, onChange: (ev: any) => setDevolucao({ ...devolucao, observacao: ev.target.value }) })
+											       ) : null,
+			      e("div", { className: "field" },
+					        e("label", null, "Local"),
+					        e("input", { value: devolucao.local, onChange: (ev: any) => setDevolucao({ ...devolucao, local: ev.target.value }) })
+					      ),
+			      e(SignaturePad, {
+					          confirmed: !!assinaturaSala,
+					          onConfirm: (dataUrl: string) => setAssinaturaSala(dataUrl),
+					          onClear: () => setAssinaturaSala(null),
+					          label: "Assinatura Digital do Responsavel da Sala de Meios"
+				  }),
+			      e("div", { style: { display: "flex", gap: 10 } },
+					        e("button", { className: "btn btn-ghost", onClick: () => setFinalizandoId(null), disabled: salvandoFinalizacao }, "Cancelar"),
+					        e("button", { className: "btn btn-primary", onClick: () => confirmarFinalizacao(item), disabled: salvandoFinalizacao },
+							            salvandoFinalizacao ? "Salvando..." : "Confirmar Finalizacao"
+							          )
+					      )
 			    );
-  }
+}
 
-  function renderAssinadaItem(item: Relatorio) {
-	      const info = React.createElement(
-			        "div",
-			  { style: { fontSize: 12.5, color: "var(--color-text-dim)", marginBottom: 8 } },
-			        `${new Date(item.data + "T00:00:00").toLocaleDateString("pt-BR")} — ${item.pelotao} — Responsável: ${item.responsavel.nome_guerra}`
-			      );
-
-	    const botaoFinalizar = React.createElement(
-			      "button",
-			{ className: "btn btn-primary", onClick: () => abrirFinalizacao(item) },
-			      "Finalizar Cautela (Sala de Meios)"
-			    );
-
-	    const painelFinalizacao =
-			      finalizandoId === item.id
-	          ? React.createElement(
-				              "div",
-				  { style: { marginTop: 14, display: "flex", flexDirection: "column", gap: 12 } },
-				              React.createElement(
-								                "div",
-								  { className: "field" },
-								                React.createElement("label", null, "Data da Devolução"),
-								                React.createElement("input", {
-													                type: "date",
-													                value: devolucao.data,
-													                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setDevolucao({ ...devolucao, data: e.target.value })
-												})
-								              ),
-				              React.createElement(
-								                "div",
-								  { style: { display: "flex", gap: 16 } },
-								                React.createElement(
-													                "label",
-													{ style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 } },
-													                React.createElement("input", {
-																		                  type: "radio",
-																		                  checked: !devolucao.comAlteracao,
-																		                  onChange: () => setDevolucao({ ...devolucao, comAlteracao: false })
-																	}),
-													                "Sem alteração"
-													              ),
-								                React.createElement(
-													                "label",
-													{ style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 } },
-													                React.createElement("input", {
-																		                  type: "radio",
-																		                  checked: devolucao.comAlteracao,
-																		                  onChange: () => setDevolucao({ ...devolucao, comAlteracao: true })
-																	}),
-													                "Com alteração"
-													              )
-								              ),
-				              devolucao.comAlteracao
-				                ? React.createElement(
-									                  "div",
-									{ className: "field" },
-									                  React.createElement("label", null, "Observação da Alteração"),
-									                  React.createElement("textarea", {
-														                      rows: 3,
-														                      value: devolucao.observacao,
-														                      onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setDevolucao({ ...devolucao, observacao: e.target.value })
-													  })
-									                )
-				                : null,
-				              React.createElement(
-								                "div",
-								  { className: "field" },
-								                React.createElement("label", null, "Local"),
-								                React.createElement("input", {
-													                value: devolucao.local,
-													                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setDevolucao({ ...devolucao, local: e.target.value })
-												})
-								              ),
-				              React.createElement(SignaturePad, {
-								                confirmed: !!assinaturaSala,
-								                onConfirm: (dataUrl: string) => setAssinaturaSala(dataUrl),
-								                onClear: () => setAssinaturaSala(null),
-								                label: "Assinatura Digital do Responsável da Sala de Meios"
-							  }),
-				              React.createElement(
-								                "div",
-								  { style: { display: "flex", gap: 10 } },
-								                React.createElement(
-													                "button",
-													{ className: "btn btn-ghost", onClick: () => setFinalizandoId(null), disabled: salvandoFinalizacao },
-													                "Cancelar"
-													              ),
-								                React.createElement(
-													                "button",
-													{ className: "btn btn-primary", onClick: () => confirmarFinalizacao(item), disabled: salvandoFinalizacao },
-													                salvandoFinalizacao ? "Salvando..." : "Confirmar Finalização"
-													              )
-								              )
-				            )
-			        : null;
-
-	    return React.createElement(
+function renderPendenciaComandante(item: Relatorio) {
+	    const info = e(
 			      "div",
+			{ style: { fontSize: 12.5, color: "var(--color-text-dim)", marginBottom: 8 } },
+			      `${new Date(item.data + "T00:00:00").toLocaleDateString("pt-BR")} - ${item.pelotao} - Responsavel: ${item.responsavel.nome_guerra}`
+			    );
+	    if (assinandoId !== item.id) {
+			      return e(
+					          "div",
+					  { key: `pend-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+					          info,
+					          e("button", { className: "btn btn-primary", onClick: () => abrirAssinatura(item.id) }, "Assinar Cautela")
+					        );
+		}
+	    const painel = e(
+			      "div",
+			{ style: { marginTop: 14 } },
+			      e("div", { className: "field", style: { marginBottom: 14 } },
+					        e("label", null, "Designar Responsavel da Sala de Meios"),
+					        e(
+								          "select",
+								{ value: salaSelecionada.policial_id ?? "", onChange: (ev: any) => selecionarSala(ev.target.value) },
+								          e("option", { value: "" }, "Selecione o policial que ira finalizar esta cautela..."),
+								          policiais.map((p) => e("option", { key: p.id, value: p.id }, `${p.nome_guerra} - ${p.nome_completo}`))
+								        ),
+					        e("p", { style: { fontSize: 12, color: "var(--color-text-dim)", marginTop: 6 } },
+							            "O policial selecionado recebera acesso para finalizar, gerar o PDF e salvar esta cautela."
+							          )
+					      ),
+			e(SignaturePad, {
+				confirmed: !!assinaturaComandante,
+				onConfirm: (dataUrl: string) => setAssinaturaComandante(dataUrl),
+				onClear: () => setAssinaturaComandante(null),
+				label: "Assinatura Digital do Comandante de Pelotao"
+			}),
+			e("div", { style: { display: "flex", gap: 10, marginTop: 12 } },
+			  e("button", { className: "btn btn-ghost", onClick: () => setAssinandoId(null), disabled: salvandoAssinatura }, "Cancelar"),
+			  e("button", { className: "btn btn-primary", onClick: () => confirmarAssinatura(item.id), disabled: salvandoAssinatura },
+				salvandoAssinatura ? "Salvando..." : "Confirmar Assinatura"
+				)
+			  )
+			);
+	return e(
+		"div",
+		{ key: `pend-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+		info,
+		painel
+		);
+}
+
+	function renderAssinadaComandante(item: Relatorio) {
+		const designado = item.sala_meios_designado;
+		const souEuMesmo = designado && perfil && designado.matricula === perfil.matricula;
+		const info = e(
+			"div",
+			{ style: { fontSize: 12.5, color: "var(--color-text-dim)", marginBottom: 8 } },
+			`${new Date(item.data + "T00:00:00").toLocaleDateString("pt-BR")} - ${item.pelotao} - Responsavel: ${item.responsavel.nome_guerra}`
+			);
+if (item.finalizado) {
+	return e(
+		"div",
+		{ key: `assin-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+		info,
+		e("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+		  e("span", { style: { fontSize: 13 } }, "Cautela finalizada."),
+		  e("button", { className: "btn btn-ghost", onClick: () => setDocumentoAtivo(item) }, "Ver PDF")
+		  )
+		);
+}
+		if (designado && !souEuMesmo) {
+			
+		
+			return e(
+				"div",
+				{ key: `assin-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+				info,
+				e("p", { style: { fontSize: 13 } }, `Encaminhada para ${designado.nome_guerra} (Sala de Meios) para finalizacao.`)
+				);
+		}
+		if (finalizandoId !== item.id) {
+			return e(
+				"div",
+				{ key: `assin-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+				info,
+				e("button", { className: "btn btn-primary", onClick: () => abrirFinalizacao(item) }, "Finalizar Cautela")
+				);
+		}
+		return e(
+			"div",
 			{ key: `assin-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
-			      info,
-			      finalizandoId === item.id ? painelFinalizacao : botaoFinalizar
-			    );
-  }
+			info,
+			renderFinalizacaoForm(item)
+			);
+	}
 
-  const blocoPendencias = React.createElement(
-	      "div",
-	  { className: "panel", style: { padding: 20, marginTop: 20, width: "100%" } },
-	      React.createElement("h3", { style: { fontSize: 14, marginBottom: 14 } }, "Cautelas — Comandante de Pelotão"),
-	      carregandoPendencias
-	        ? React.createElement("p", { style: { fontSize: 13, color: "var(--color-text-dim)" } }, "Carregando...")
-	        : pendencias.length === 0 && assinadas.length === 0
-	        ? React.createElement(
-				          "p",
-				{ style: { fontSize: 13, color: "var(--color-text-dim)" } },
-				          "Nenhuma cautela pendente para você no momento."
-				        )
-	        : React.createElement(
-				          "div",
-				          null,
-				          pendencias.length > 0
-				            ? React.createElement(
-								                "div",
-								{ style: { marginBottom: 16 } },
-								                React.createElement("p", { className: "eyebrow", style: { marginBottom: 10 } }, "Aguardando sua assinatura"),
-								                pendencias.map(renderPendenciaItem)
-								              )
-				            : null,
-				          assinadas.length > 0
-				            ? React.createElement(
-								                "div",
-								                null,
-								                React.createElement("p", { className: "eyebrow", style: { marginBottom: 10 } }, "Assinadas — aguardando finalização"),
-								                assinadas.map(renderAssinadaItem)
-								              )
-				            : null
-				        )
-	    );
+	function renderPendenciaSala(item: Relatorio) {
+		const info = e(
+			"div",
+			{ style: { fontSize: 12.5, color: "var(--color-text-dim)", marginBottom: 8 } },
+			`${new Date(item.data + "T00:00:00").toLocaleDateString("pt-BR")} - ${item.pelotao} - Responsavel: ${item.responsavel.nome_guerra}`
+			);
+		if (finalizandoId !== item.id) {
+			return e(
+				"div",
+				{ key: `sala-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+				info,
+				e("button", { className: "btn btn-primary", onClick: () => abrirFinalizacao(item) }, "Finalizar Cautela")
+				);
+		}
+		return e(
+			"div",
+			{ key: `sala-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12 } },
+			info,
+			renderFinalizacaoForm(item)
+			);
+	}
 
-  return React.createElement(
-	      "div",
-	  { className: "login-wrapper" },
-	      React.createElement(
-			        "div",
-			  { className: "panel login-card", style: { maxWidth: 560 } },
-			        React.createElement(
-						        "div",
-						{ style: { display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 28 } },
-						        React.createElement(Emblem, { size: 100 }),
-						        React.createElement("h1", { style: { fontSize: 22, marginTop: 16, textAlign: "center" } }, "CONTROLE SALA DE MEIOS"),
-						        React.createElement("p", { className: "eyebrow", style: { marginTop: 6 } }, "ACESSO RESTRITO · MEUS DADOS")
-						      ),
-			        loading ? React.createElement("p", { style: { textAlign: "center" } }, "Carregando...") : null,
-			        erro ? React.createElement("p", { style: { color: "#f0d6d6", textAlign: "center" } }, erro) : null,
-			        blocoDados,
-			        mensagemVazia,
-			        blocoContato,
-			        blocoSenha,
-			        blocoAdmin,
-			        blocoPendencias,
-			        React.createElement(
-						        "button",
-						{ className: "btn btn-primary", style: { marginTop: 24 }, onClick: () => navigate("/servico") },
-						        "Formulário de Cautela"
-						      ),
-			        React.createElement(
-						        "button",
-						{ className: "btn btn-primary", style: { marginTop: 24 }, onClick: logout },
-						        "Sair"
-						      )
-			      )
-	    );
+	function renderFinalizadaSala(item: Relatorio) {
+		const info = e(
+			"div",
+			{ style: { fontSize: 12.5, color: "var(--color-text-dim)", marginBottom: 8 } },
+			`${new Date(item.data + "T00:00:00").toLocaleDateString("pt-BR")} - ${item.pelotao} - Responsavel: ${item.responsavel.nome_guerra}`
+			);
+		return e(
+			"div",
+			{ key: `sala-fin-${item.id}`, className: "panel", style: { padding: 16, marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+			info,
+			e("button", { className: "btn btn-ghost", onClick: () => setDocumentoAtivo(item) }, "Ver PDF")
+			);
+	}
+	
+		
+
+if (loading) {
+	return e(
+		"div",
+		{ className: "login-wrapper", style: { background: "#fff", minHeight: "100vh" } },
+		e("div", { className: "login-card panel", style: { textAlign: "center" } }, "Carregando...")
+		);
+}
+
+return e(
+	"div",
+	{ className: "login-wrapper", style: { background: "#fff", minHeight: "100vh", padding: "24px 12px" } },
+	e(
+		"div",
+		{ className: "login-card panel", style: { maxWidth: 720, margin: "0 auto" } },
+		e(Emblem, null),
+		e("h2", { style: { textAlign: "center", marginTop: 12 } }, "Meu Perfil"),
+		erro ? e("p", { style: { color: "#c0392b", textAlign: "center" } }, erro) : null,
+		!perfil ? e("p", { style: { textAlign: "center" } }, "Nenhum cadastro encontrado.") : null,
+		perfil ? e(
+			"div",
+			{ style: { marginBottom: 20 } },
+			e("p", null, e("strong", null, "Nome de Guerra: "), perfil.nome_guerra),
+			e("p", null, e("strong", null, "Nome Completo: "), perfil.nome_completo),
+			e("p", null, e("strong", null, "Matricula: "), perfil.matricula),
+			e("p", null, e("strong", null, "Pelotao: "), perfil.pelotao)
+			) : null,
+		e(
+			"div",
+			{ className: "panel", style: { padding: 16, marginBottom: 16 } },
+			e("h3", null, "Contato"),
+			e("div", { className: "field" },
+			  e("label", null, "Telefone"),
+			  e("input", { value: telefone, onChange: (ev: any) => setTelefone(ev.target.value) })
+			  ),
+			e("div", { className: "field" },
+			  e("label", null, "Email de Recuperacao"),
+			  e("input", { value: emailRecuperacao, onChange: (ev: any) => setEmailRecuperacao(ev.target.value) })
+			  ),
+			e("button", { className: "btn btn-primary", onClick: salvarContato, disabled: salvandoContato },
+			  salvandoContato ? "Salvando..." : "Salvar Contato"
+			  )
+			),
+		e(
+			"div",
+			{ className: "panel", style: { padding: 16, marginBottom: 16 } },
+			e("h3", null, "Alterar Senha"),
+			e("div", { className: "field" },
+			  e("label", null, "Nova Senha"),
+			  e("input", { type: "password", value: novaSenha, onChange: (ev: any) => setNovaSenha(ev.target.value) })
+			  ),
+			e("div", { className: "field" },
+			  e("label", null, "Confirmar Senha"),
+			  e("input", { type: "password", value: confirmarSenha, onChange: (ev: any) => setConfirmarSenha(ev.target.value) })
+			  ),
+			e("button", { className: "btn btn-primary", onClick: salvarSenha, disabled: salvandoSenha },
+			  salvandoSenha ? "Salvando..." : "Alterar Senha"
+			  )
+			),
+		perfil && perfil.is_admin ? e(
+			"div",
+			{ className: "panel", style: { padding: 16, marginBottom: 16 } },
+			e("h3", null, "Administracao"),
+			e("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" } },
+			  e("button", { className: "btn btn-ghost", onClick: () => navigate("/admin/permissoes") }, "Gerenciar Admins"),
+			  e("button", { className: "btn btn-ghost", onClick: () => navigate("/admin/relatorios") }, "Relatorios e Cautelas")
+			  )
+			) : null,
+		(pendencias.length > 0 || assinadas.length > 0) ? e(
+			"div",
+			{ className: "panel", style: { padding: 16, marginBottom: 16 } },
+			e("h3", null, "Cautelas - Comandante de Pelotao"),
+			pendencias.map(renderPendenciaComandante),
+			assinadas.map(renderAssinadaComandante)
+			) : null,
+		(pendenciasSala.length > 0 || finalizadasSala.length > 0) ? e(
+			"div",
+			{ className: "panel", style: { padding: 16, marginBottom: 16 } },
+			e("h3", null, "Cautelas - Sala de Meios (Designado)"),
+			pendenciasSala.map(renderPendenciaSala),
+			finalizadasSala.map(renderFinalizadaSala)
+		) : null,
+		e("div", { style: { display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" } },
+		  e("button", { className: "btn btn-primary", onClick: () => navigate("/pelotao/formulario") }, "Formulario de Cautela"),
+		  e("button", { className: "btn btn-ghost", onClick: () => { logout(); navigate("/login"); } }, "Sair")
+		  ),
+		documentoAtivo ? e(
+			"div",
+			{ className: "modal-overlay", style: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 } },
+			e(
+				"div",
+				{ className: "panel", style: { background: "#fff", maxHeight: "90vh", overflow: "auto", padding: 16 } },
+				e("div", { ref: docRef }, e(RelatorioDocumento, { relatorio: documentoAtivo })),
+				e("div", { style: { display: "flex", gap: 10, marginTop: 12 } },
+				  e("button", { className: "btn btn-primary", onClick: baixarPdf, disabled: gerandoPdf }, gerandoPdf ? "Gerando..." : "Baixar PDF"),
+				  e("button", { className: "btn btn-ghost", onClick: () => setDocumentoAtivo(null) }, "Fechar")
+				  )
+				)
+			) : null
+		)
+	);
 }

@@ -4,6 +4,7 @@ import { PELOTOES, MODELOS_ARMAMENTO, ACESSORIOS_PADRAO, ITENS_MATERIAL_VIATURA,
 import type { Distribuicao, Policial, Responsavel, ItemMaterial, Devolucao } from "../../types";
 import { SignaturePad } from "../../components/SignaturePad";
 import { useToast } from "../../context/ToastContext";
+import { useAuth } from "../../context/AuthContext";
 
 function novaLinha(): Distribuicao {
   return {
@@ -41,6 +42,7 @@ function devolucaoVazia(): Devolucao {
 
 export function FormularioServico() {
   const { notify } = useToast();
+  const { auth } = useAuth();
   const [policiais, setPoliciais] = useState<Policial[]>([]);
   const [carregandoPoliciais, setCarregandoPoliciais] = useState(true);
 
@@ -50,7 +52,6 @@ export function FormularioServico() {
   const [responsavel, setResponsavel] = useState<Responsavel>(responsavelVazio());
   const [assinatura, setAssinatura] = useState<string | null>(null);
   const [comandante, setComandante] = useState<Responsavel>(responsavelVazio());
-  const [assinaturaComandante, setAssinaturaComandante] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   const [itensGeral, setItensGeral] = useState<ItemMaterial[]>(itensGeralVazio());
@@ -64,6 +65,14 @@ export function FormularioServico() {
       .catch(() => notify("Não foi possível carregar o cadastro de policiais.", "error"))
       .finally(() => setCarregandoPoliciais(false));
   }, []);
+
+  useEffect(() => {
+    if (!auth?.matricula || policiais.length === 0) return;
+    const p = policiais.find((x) => x.matricula === auth.matricula);
+    if (p) {
+      setResponsavel({ policial_id: p.id, nome_completo: p.nome_completo, nome_guerra: p.nome_guerra, matricula: p.matricula });
+    }
+  }, [auth?.matricula, policiais]);
 
   function atualizarLinha(index: number, patch: Partial<Distribuicao>) {
     setLinhas((prev) => prev.map((linha, i) => (i === index ? { ...linha, ...patch } : linha)));
@@ -167,10 +176,9 @@ export function FormularioServico() {
       if (!l.horario) return `Informe o horário da carga na linha ${i + 1}.`;
       if (!l.armamento.trim()) return `Informe o armamento na linha ${i + 1}.`;
     }
-    if (!responsavel.policial_id) return "Selecione o responsável pelo preenchimento.";
+    if (!responsavel.policial_id) return "Não foi possível identificar o responsável pelo preenchimento. Faça login novamente.";
     if (!assinatura) return "Confirme a assinatura digital do responsável antes de enviar.";
-    if (!comandante.policial_id) return "Selecione o Comandante de Pelotão.";
-    if (!assinaturaComandante) return "Confirme a assinatura digital do Comandante de Pelotão antes de enviar.";
+        if (!comandante.policial_id) return "Selecione o Comandante de Pelotão.";
     return null;
   }
 
@@ -192,14 +200,11 @@ export function FormularioServico() {
         itens_viatura: { geral: itensGeral, municaoEspecial: itensMunicao, observacoesGerais: observacoesItens },
         devolucao: devolucaoVazia(),
         comandante,
-        assinatura_comandante: assinaturaComandante,
-      });
-      notify("Relatório salvo e enviado à Sala de Meios com sucesso.", "success");
+        assinatura_comandante: null,      });
+      notify("Relatório salvo. Aguardando assinatura do Comandante de Pelotão.", "success");
       setLinhas([novaLinha()]);
-      setResponsavel(responsavelVazio());
       setAssinatura(null);
       setComandante(responsavelVazio());
-      setAssinaturaComandante(null);
       setPelotao(PELOTOES[0]);
       setData(new Date().toISOString().slice(0, 10));
       setItensGeral(itensGeralVazio());
@@ -508,17 +513,10 @@ export function FormularioServico() {
 
           <div className="grid-two-panels">
             <div>
-              <div className="field" style={{ marginBottom: 16 }}>
-                <label>Responsável pelo Preenchimento (Sala de Meios)</label>
-                <select value={responsavel.policial_id ?? ""} onChange={(e) => selecionarResponsavel(e.target.value)} required>
-                  <option value="">Selecione o responsável...</option>
-                  {policiais.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nome_guerra} — {p.nome_completo}
-                    </option>
-                  ))}
-                </select>
-              </div>
+<div className="field" style={{ marginBottom: 16 }}>
+  <label>Responsável pelo Preenchimento (Sala de Meios)</label>
+  <p style={{ fontSize: 12.5, color: "var(--color-text-dim)", marginTop: 6 }}>Preenchido automaticamente com os dados do seu login.</p>
+</div>
 
               {responsavel.policial_id && (
                 <div className="grid-form-2" style={{ marginBottom: 20 }}>
@@ -567,12 +565,7 @@ export function FormularioServico() {
                 </div>
               )}
 
-              <SignaturePad
-                confirmed={!!assinaturaComandante}
-                onConfirm={(dataUrl) => setAssinaturaComandante(dataUrl)}
-                onClear={() => setAssinaturaComandante(null)}
-                label="Assinatura Digital do Comandante de Pelotão"
-              />
+        <p style={{ fontSize: 12.5, color: "var(--color-text-dim)" }}>O Comandante de Pelotão selecionado irá assinar digitalmente esta cautela ao acessar o próprio login, em "Meu Perfil".</p>
             </div>
           </div>
         </section>
@@ -582,7 +575,7 @@ export function FormularioServico() {
             D · DEVOLUÇÃO PARA A SALA DE MEIOS
           </span>
           <span style={{ fontSize: 12.5, color: "var(--color-text-dim)" }}>
-            Esta etapa será concluída pelo Administrador (Sala de Meios) no momento da finalização da cautela.
+          Esta etapa será concluída pelo Administrador (Sala de Meios) ou pelo Comandante de Pelotão, após a assinatura, no momento da finalização da cautela.
           </span>
         </div>
 

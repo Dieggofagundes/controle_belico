@@ -227,7 +227,10 @@ export function RelatorioDocumento({ relatorio: r }: Props) {
             <div style={{ height: 60 }} />
           )}
           <div style={{ borderTop: "1px solid #000", marginTop: 4, paddingTop: 6, display: "inline-block", minWidth: 260 }}>
-            <div style={{ fontSize: 12, fontWeight: 700 }}>SALA DE MEIOS</div>
+                          <div style={{ fontSize: 12, fontWeight: 700 }}>{r.responsavel_sala_meios?.nome || "SALA DE MEIOS"}
+                          </div>
+            <div style={{ fontSize: 10.5, color: "#444" }}>{r.responsavel_sala_meios?.matricula ? `Mat. ${r.responsavel_sala_meios.matricula}` : ""}
+            </div>
             <div style={{ fontSize: 10.5, marginTop: 2 }}>Responsável da Sala de Meios</div>
           </div>
         </div>

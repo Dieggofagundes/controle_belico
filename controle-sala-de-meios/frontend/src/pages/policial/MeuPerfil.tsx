@@ -504,7 +504,7 @@ return e(
 			finalizadasSala.map(renderFinalizadaSala)
 		) : null,
 		e("div", { style: { display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" } },
-		  e("button", { className: "btn btn-primary", onClick: () => navigate("/pelotao/formulario") }, "Formulario de Cautela"),
+		  e("button", { className: "btn btn-primary", onClick: () => navigate("/servico") }, "Formulario de Cautela"),
 		  e("button", { className: "btn btn-ghost", onClick: () => { logout(); navigate("/login"); } }, "Sair")
 		  ),
 		documentoAtivo ? e(
